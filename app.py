@@ -1,3 +1,4 @@
+import glob
 import os
 import pandas as pd
 import streamlit as st
@@ -7,16 +8,15 @@ st.set_page_config(
     page_title="Optimum Home - Portal de Consulta", page_icon="🏢", layout="wide"
 )
 
-# Ruta del archivo maestro definitivo en el escritorio/nube
-FILE_PATH = (
-    "/Users/cjvivas/Desktop/Data_Texas_2026_Depurada_Julio/Data_Texas_2026_Maestra_Definitiva.csv"
-)
-
-
-# Cargar los datos y mantenerlos en el estado de sesión de Streamlit
+# Cargar y unir automáticamente las partes de la base de datos de forma robusta
 if "df" not in st.session_state:
-  if os.path.exists(FILE_PATH):
-    st.session_state.df = pd.read_csv(FILE_PATH, low_memory=False)
+  current_dir = os.path.dirname(os.path.abspath(__file__))
+  pattern = os.path.join(current_dir, "parte_*.csv")
+  archivos_partes = sorted(glob.glob(pattern))
+
+  if archivos_partes:
+    df_list = [pd.read_csv(f, low_memory=False) for f in archivos_partes]
+    st.session_state.df = pd.concat(df_list, ignore_index=True)
   else:
     st.session_state.df = pd.DataFrame(
         columns=[
@@ -56,7 +56,6 @@ if not st.session_state.autenticado:
             "Contraseña incorrecta. Verifique sus credenciales de acceso."
         )
 else:
-  # Barra lateral con información de usuario y cierre de sesión
   st.sidebar.title("Panel de Control")
   st.sidebar.write(f"**Rol activo:** {st.session_state.rol}")
   if st.sidebar.button("Cerrar Sesión"):
@@ -66,7 +65,6 @@ else:
 
   st.title("🏢 Optimum Home - Consulta de Base de Datos Texas")
 
-  # VISTA PARA AGENTES DEL CALL CENTER (SOLO CONSULTA - SIN DESCARGAS)
   if st.session_state.rol == "Agente":
     st.info(
         "Modo Agente Activo: Utilice los filtros para consultar la"
@@ -105,7 +103,6 @@ else:
     st.write(f"**Registros encontrados:** {len(df_filtrado)}")
     st.dataframe(df_filtrado, use_container_width=True)
 
-  # VISTA PARA ADMINISTRADORES (GESTIÓN TOTAL Y DESCARGAS AUTORIZADAS)
   elif st.session_state.rol == "Admin":
     st.success(
         "Modo Administrador: Acceso total de gestión y actualización de datos."
@@ -159,10 +156,8 @@ else:
               "email": email_in,
               "clean_phone": phone_in,
           }
-          # Actualizar el DataFrame en la sesión y guardar en el archivo CSV
           nuevo_df = pd.DataFrame([nuevo_registro])
           st.session_state.df = pd.concat(
               [st.session_state.df, nuevo_df], ignore_index=True
           )
-          st.session_state.df.to_csv(FILE_PATH, index=False)
           st.success("¡El registro se ha incorporado exitosamente!")
