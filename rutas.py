@@ -2,23 +2,78 @@ import pandas as pd
 import streamlit as st
 
 st.set_page_config(
-    page_title="Optimum Home - Rutas del Día",
+    page_title="Optimum Home - Rutas de Campo",
     page_icon="🚗",
     layout="centered",
 )
 
 st.sidebar.markdown("### 🚗 Panel de Control de Campo")
+st.sidebar.markdown("---")
+st.sidebar.markdown("### 📂 Carga de Rutas Diarias")
 
-# Cargar el archivo CSV del día correspondiente
-try:
-  df = pd.read_csv("rutas_del_dia_2026-08-25.csv")
-except FileNotFoundError:
-  st.error(
-      "No se encontró el archivo de rutas del día"
-      " ('rutas_del_dia_2026-08-25.csv'). Por favor, verifique que esté subido"
-      " al repositorio."
+# Botón para que el administrador o call center suba el CSV del día
+uploaded_file = st.sidebar.file_uploader(
+    "Sube el archivo CSV del día:", type=["csv"]
+)
+
+if uploaded_file is not None:
+  try:
+    df = pd.read_csv(uploaded_file)
+    # Validar que contenga las columnas requeridas
+    required_cols = ["Cerrador", "Cliente", "Direccion", "Telefono", "Estatus"]
+    if not all(col in df.columns for col in required_cols):
+      st.error(
+          "El archivo CSV no tiene el formato correcto. Debe contener las"
+          " columnas: Cerrador, Cliente, Direccion, Telefono, Estatus."
+      )
+      st.stop()
+  except Exception as e:
+    st.error(f"Error al leer el archivo CSV: {e}")
+    st.stop()
+else:
+  # Datos de prueba por defecto para evitar errores si no se ha subido archivo
+  data = {
+      "Cerrador": [
+          "Carlos Vivas (Demo)",
+          "Carlos Vivas (Demo)",
+          "Cerrador 1 - Houston North",
+          "Cerrador 1 - Houston North",
+          "Cerrador 2 - Houston South",
+      ],
+      "Cliente": [
+          "Distribuidora Los Andes",
+          "Inversiones Coseinca",
+          "Alpha Logistics Corp",
+          "Lone Star Supply",
+          "Gulf Coast Energy",
+      ],
+      "Direccion": [
+          "Avenida Principal de Cabudare",
+          "Centro Comercial Loma Linda",
+          "12400 Westheimer Rd",
+          "4500 Post Oak Pkwy",
+          "900 Smith St",
+      ],
+      "Telefono": [
+          "0412-5268823",
+          "0426-0367843",
+          "713-555-0198",
+          "713-555-0245",
+          "713-555-0312",
+      ],
+      "Estatus": [
+          "Pendiente",
+          "Pendiente",
+          "Pendiente",
+          "Completado",
+          "Pendiente",
+      ],
+  }
+  df = pd.DataFrame(data)
+  st.sidebar.info(
+      "💡 Usando datos de prueba. Sube el archivo CSV del día en el botón de"
+      " arriba para actualizar las rutas."
   )
-  st.stop()
 
 # Selector de cerrador en la barra lateral
 lista_cerradores = ["Seleccione..."] + sorted(df["Cerrador"].unique().tolist())
@@ -34,9 +89,7 @@ if cerrador_activo != "Seleccione...":
   df_filtrado = df[df["Cerrador"] == cerrador_activo]
 
   st.sidebar.success(f"Usuario activo: {cerrador_activo}")
-  st.markdown(
-      f"### 📋 Visitas asignadas para: **{cerrador_activo}**"
-  )
+  st.markdown(f"### 📋 Visitas asignadas para: **{cerrador_activo}**")
   st.info(f"Total de clientes en ruta: {len(df_filtrado)}")
 
   # Mostrar la tabla limpia con los datos de las visitas
@@ -45,7 +98,7 @@ if cerrador_activo != "Seleccione...":
       use_container_width=True,
   )
 
-  # Opcional: Detalle interactivo por cliente
+  # Detalle interactivo por cliente
   st.markdown("---")
   st.markdown("### 🔍 Detalle de Visita")
   cliente_seleccionado = st.selectbox(
