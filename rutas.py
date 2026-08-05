@@ -31,17 +31,20 @@ if uploaded_file is not None:
         "Direccion",
         "Telefono",
         "Estatus",
+        "lat",
+        "lon",
     ]
     if not all(col in df.columns for col in required_cols):
       st.error(
           "El archivo CSV debe contener las columnas: Cerrador, Hora, Cliente,"
-          " Direccion, Telefono, Estatus."
+          " Direccion, Telefono, Estatus, lat, lon."
       )
       st.stop()
   except Exception as e:
     st.error(f"Error al leer el archivo CSV: {e}")
     st.stop()
 else:
+  # Datos de prueba con coordenadas (lat, lon) para la vista general en el mapa
   data = {
       "Cerrador": [
           "Carlos Vivas (Demo)",
@@ -61,10 +64,13 @@ else:
       ],
       "Telefono": ["0412-5268823", "0426-0367843", "0412-1112233"],
       "Estatus": ["Pendiente", "Pendiente", "Pendiente"],
+      "lat": [10.0890, 10.0750, 10.0670],
+      "lon": [-69.2930, -69.3120, -69.3220],
   }
   df = pd.DataFrame(data)
   st.sidebar.info(
-      "💡 Usando datos de prueba con horario. Sube tu CSV para actualizar."
+      "💡 Usando datos de prueba con mapa y horarios. Sube tu CSV para"
+      " actualizar."
   )
 
 lista_cerradores = ["Seleccione..."] + sorted(df["Cerrador"].unique().tolist())
@@ -96,13 +102,26 @@ if cerrador_activo != "Seleccione...":
   )
   st.info(f"Total de clientes en ruta: {len(df_filtrado)}")
 
+  # --- VISTA GENERAL DE MAPA (MACRO RUTA) ---
+  st.markdown("### 🗺️ Vista General de tu Ruta del Día")
+  st.write(
+      "Este mapa muestra todas tus paradas asignadas para que puedas"
+      " planificar visualmente tu desplazamiento:"
+  )
+  if "lat" in df_filtrado.columns and "lon" in df_filtrado.columns:
+    st.map(df_filtrado, latitude="lat", longitude="lon", zoom=12)
+  st.markdown("---")
+
+  # --- TABLA DE RESUMEN ---
+  st.markdown("### 📋 Listado Cronológico")
   st.dataframe(
       df_filtrado[["Hora", "Cliente", "Direccion", "Telefono", "Estatus"]],
       use_container_width=True,
   )
 
+  # --- DETALLE Y NAVEGACIÓN GPS ---
   st.markdown("---")
-  st.markdown("### 🔍 Detalle de Visita y Navegación")
+  st.markdown("### 🔍 Detalle de Visita y Navegación Individual")
   cliente_seleccionado = st.selectbox(
       "Seleccione un cliente para gestionar:",
       df_filtrado["Cliente"].tolist(),
