@@ -3,12 +3,23 @@ import pandas as pd
 import streamlit as st
 
 st.set_page_config(
-    page_title="Optimum Home - Rutas del Día",
+    page_title="Optimum Home - Rutas de Campo",
     page_icon="🚗",
     layout="centered",
 )
 
-st.sidebar.markdown("### 🚗 Panel de Control de Campo")
+# --- IDENTIDAD CORPORATIVA OPTIMUM ---
+st.sidebar.markdown(
+    """
+    <div style="text-align: center; padding: 10px; background-color: #1E3A8A; color: white; border-radius: 8px; margin-bottom: 15px;">
+        <h2 style="margin: 0; font-size: 20px;">🏠 OPTIMUM HOME</h2>
+        <p style="margin: 5px 0 0 0; font-size: 12px; color: #93C5FD;">Gestión de Operaciones y Campo</p>
+    </div>
+""",
+    unsafe_allow_html=True,
+)
+
+st.sidebar.markdown("### 🚗 Panel de Control")
 st.sidebar.markdown("---")
 st.sidebar.markdown("### 📂 Carga de Rutas Diarias")
 
@@ -67,7 +78,16 @@ cerrador_activo = st.sidebar.selectbox(
     "Seleccione su Usuario (Cerrador):", lista_cerradores
 )
 
-st.markdown("## 📍 Planificador de Rutas - Operaciones Diarias")
+# Encabezado principal con imagen corporativa simulada
+st.markdown(
+    """
+    <div style="background: linear-gradient(90deg, #1E3A8A 0%, #3B82F6 100%); padding: 15px; border-radius: 8px; color: white; margin-bottom: 20px;">
+        <h2 style="margin: 0; font-size: 24px;">📍 Optimum Home - Planificador de Rutas</h2>
+        <p style="margin: 5px 0 0 0; font-size: 14px;">Control operativo y navegación inteligente para cerradores</p>
+    </div>
+""",
+    unsafe_allow_html=True,
+)
 
 if cerrador_activo != "Seleccione...":
   df_filtrado = df[df["Cerrador"] == cerrador_activo]
