@@ -6,10 +6,11 @@ st.set_page_config(
 )
 
 with st.sidebar:
+  # Carga segura del logo (si no lo encuentra, muestra texto elegante en vez de dar error)
   try:
     st.image("logo_optimum.png", use_container_width=True)
   except:
-    st.title("🏢 Optimum Home")
+    st.markdown("## 🏢 Optimum Home")
 
   st.markdown("### Panel de Control de Campo")
 
