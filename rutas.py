@@ -8,18 +8,12 @@ st.set_page_config(
     layout="centered",
 )
 
-# --- IDENTIDAD CORPORATIVA OPTIMUM ---
-st.sidebar.markdown(
-    """
-    <div style="text-align: center; padding: 10px; background-color: #1E3A8A; color: white; border-radius: 8px; margin-bottom: 15px;">
-        <h2 style="margin: 0; font-size: 20px;">🏠 OPTIMUM HOME</h2>
-        <p style="margin: 5px 0 0 0; font-size: 12px; color: #93C5FD;">Gestión de Operaciones y Campo</p>
-    </div>
-""",
-    unsafe_allow_html=True,
-)
+# --- LOGOTIPO OFICIAL DE LA EMPRESA ---
+try:
+  st.sidebar.image("logo_optimum.png", use_container_width=True)
+except Exception:
+  st.sidebar.markdown("### 🏠 OPTIMUM HOME")
 
-st.sidebar.markdown("### 🚗 Panel de Control")
 st.sidebar.markdown("---")
 st.sidebar.markdown("### 📂 Carga de Rutas Diarias")
 
@@ -78,7 +72,6 @@ cerrador_activo = st.sidebar.selectbox(
     "Seleccione su Usuario (Cerrador):", lista_cerradores
 )
 
-# Encabezado principal con imagen corporativa simulada
 st.markdown(
     """
     <div style="background: linear-gradient(90deg, #1E3A8A 0%, #3B82F6 100%); padding: 15px; border-radius: 8px; color: white; margin-bottom: 20px;">
