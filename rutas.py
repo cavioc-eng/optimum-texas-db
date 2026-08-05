@@ -1,5 +1,6 @@
 import urllib.parse
 import pandas as pd
+import pydeck as pdk
 import streamlit as st
 
 st.set_page_config(
@@ -44,33 +45,31 @@ if uploaded_file is not None:
     st.error(f"Error al leer el archivo CSV: {e}")
     st.stop()
 else:
-  # Datos de prueba con coordenadas (lat, lon) para la vista general en el mapa
   data = {
       "Cerrador": [
           "Carlos Vivas (Demo)",
           "Carlos Vivas (Demo)",
           "Carlos Vivas (Demo)",
       ],
-      "Hora": ["09:00 AM", "11:30 AM", "02:30 PM"],
+      "Hora": ["09:00 AM", "02:30 PM", "11:30 AM"],  # Desordenadas a propósito
       "Cliente": [
           "Distribuidora Los Andes",
-          "Inversiones Coseinca",
           "Comercial Lara C.A.",
+          "Inversiones Coseinca",
       ],
       "Direccion": [
           "Avenida Principal de Cabudare",
-          "Centro Comercial Loma Linda",
           "Avenida Venezuela Barquisimeto",
+          "Centro Comercial Loma Linda",
       ],
-      "Telefono": ["0412-5268823", "0426-0367843", "0412-1112233"],
+      "Telefono": ["0412-5268823", "0412-1112233", "0426-0367843"],
       "Estatus": ["Pendiente", "Pendiente", "Pendiente"],
-      "lat": [10.0890, 10.0750, 10.0670],
-      "lon": [-69.2930, -69.3120, -69.3220],
+      "lat": [10.0890, 10.0670, 10.0750],
+      "lon": [-69.2930, -69.3220, -69.3120],
   }
   df = pd.DataFrame(data)
   st.sidebar.info(
-      "💡 Usando datos de prueba con mapa y horarios. Sube tu CSV para"
-      " actualizar."
+      "💡 Usando datos de prueba. Sube tu CSV para actualizar las rutas."
   )
 
 lista_cerradores = ["Seleccione..."] + sorted(df["Cerrador"].unique().tolist())
@@ -89,49 +88,106 @@ st.markdown(
 )
 
 if cerrador_activo != "Seleccione...":
-  df_filtrado = df[df["Cerrador"] == cerrador_activo]
+  df_filtrado = df[df["Cerrador"] == cerrador_activo].copy()
 
+  # --- ORDENAMIENTO CRONOLÓGICO EXACTO POR HORA ---
   if "Hora" in df_filtrado.columns:
-    df_filtrado = df_filtrado.sort_values(by="Hora")
+    try:
+      df_filtrado["temp_hora"] = pd.to_datetime(
+          df_filtrado["Hora"], format="%I:%M %p"
+      )
+      df_filtrado = df_filtrado.sort_values(by="temp_hora")
+      df_filtrado = df_filtrado.drop(columns=["temp_hora"])
+    except Exception:
+      df_filtrado = df_filtrado.sort_values(by="Hora")
+
+  # Asignar secuencia numérica 1, 2, 3...
+  df_filtrado = df_filtrado.reset_index(drop=True)
+  df_filtrado["Secuencia"] = range(1, len(df_filtrado) + 1)
 
   st.sidebar.success(f"Usuario activo: {cerrador_activo}")
   st.markdown(f"### 📋 Visitas asignadas para: **{cerrador_activo}**")
   st.info(
-      "🕒 Tus citas están ordenadas automáticamente desde la hora más temprana"
-      " para optimizar tu recorrido."
+      "🕒 Tus citas están ordenadas cronológicamente de la más temprana a la"
+      " más tardía."
   )
   st.info(f"Total de clientes en ruta: {len(df_filtrado)}")
 
-  # --- VISTA GENERAL DE MAPA (MACRO RUTA) ---
-  st.markdown("### 🗺️ Vista General de tu Ruta del Día")
+  # --- MAPA INTERACTIVO CON SECUENCIA NUMÉRICA ---
+  st.markdown("### 🗺️ Secuencia de Ruta en el Mapa")
   st.write(
-      "Este mapa muestra todas tus paradas asignadas para que puedas"
-      " planificar visualmente tu desplazamiento:"
+      "Los números en el mapa indican el orden exacto en el que debes visitar"
+      " cada parada:"
   )
+
   if "lat" in df_filtrado.columns and "lon" in df_filtrado.columns:
-    st.map(df_filtrado, latitude="lat", longitude="lon", zoom=12)
+    lat_centro = df_filtrado["lat"].mean()
+    lon_centro = df_filtrado["lon"].mean()
+
+    # Capa de puntos (círculos)
+    layer_scatter = pdk.Layer(
+        "ScatterplotLayer",
+        data=df_filtrado,
+        get_position=["lon", "lat"],
+        get_fill_color=[30, 58, 138, 200],  # Azul corporativo
+        get_radius=300,
+        pickable=True,
+    )
+
+    # Capa de texto (números de secuencia 1, 2, 3...)
+    layer_text = pdk.Layer(
+        "TextLayer",
+        data=df_filtrado,
+        get_position=["lon", "lat"],
+        get_text="Secuencia",
+        get_color=[255, 255, 255],
+        get_size=18,
+        get_alignment_baseline="'center'",
+        get_text_anchor="'middle'",
+    )
+
+    view_state = pdk.ViewState(
+        latitude=lat_centro, longitude=lon_centro, zoom=12, pitch=0
+    )
+
+    r = pdk.Deck(
+        layers=[layer_scatter, layer_text],
+        initial_view_state=view_state,
+        tooltip={
+            "html": "<b>Parada #{Secuencia}</b><br>Cliente: {Cliente}<br>Hora:"
+            " {Hora}",
+            "style": {"backgroundColor": "#1E3A8A", "color": "white"},
+        },
+    )
+    st.pydeck_chart(r)
+
   st.markdown("---")
 
-  # --- TABLA DE RESUMEN ---
-  st.markdown("### 📋 Listado Cronológico")
+  # --- TABLA DE RESUMEN CON SECUENCIA ---
+  st.markdown("### 📋 Listado de Paradas")
   st.dataframe(
-      df_filtrado[["Hora", "Cliente", "Direccion", "Telefono", "Estatus"]],
+      df_filtrado[["Secuencia", "Hora", "Cliente", "Direccion", "Telefono", "Estatus"]],
       use_container_width=True,
   )
 
   # --- DETALLE Y NAVEGACIÓN GPS ---
   st.markdown("---")
   st.markdown("### 🔍 Detalle de Visita y Navegación Individual")
-  cliente_seleccionado = st.selectbox(
-      "Seleccione un cliente para gestionar:",
-      df_filtrado["Cliente"].tolist(),
+  cliente_opciones = [
+      f"Parada {row.Secuencia} - {row.Cliente} ({row.Hora})"
+      for row in df_filtrado.itertuples()
+  ]
+  seleccion_str = st.selectbox(
+      "Seleccione un cliente para gestionar:", cliente_opciones
   )
 
-  if cliente_seleccionado:
-    datos_cliente = df_filtrado[
-        df_filtrado["Cliente"] == cliente_seleccionado
-    ].iloc[0]
+  if seleccion_str:
+    idx_sel = cliente_opciones.index(seleccion_str)
+    datos_cliente = df_filtrado.iloc[idx_sel]
+
+    st.write(f"**Parada número:** {datos_cliente['Secuencia']}")
     st.write(f"**Hora de la cita:** {datos_cliente['Hora']}")
+    st.write(f"**Cliente:** {datos_cliente['Cliente']}")
     st.write(f"**Dirección:** {datos_cliente['Direccion']}")
     st.write(f"**Teléfono:** {datos_cliente['Telefono']}")
     st.write(f"**Estatus actual:** {datos_cliente['Estatus']}")
@@ -152,8 +208,8 @@ if cerrador_activo != "Seleccione...":
     st.markdown("<br>", unsafe_allow_html=True)
     if st.button("Marcar visita como Completada"):
       st.success(
-          f"La visita al cliente {cliente_seleccionado} ha sido registrada con"
-          " éxito."
+          f"La visita al cliente {datos_cliente['Cliente']} ha sido registrada"
+          " con éxito."
       )
 
 else:
