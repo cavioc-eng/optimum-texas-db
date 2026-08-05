@@ -12,7 +12,6 @@ st.sidebar.markdown("### 🚗 Panel de Control de Campo")
 st.sidebar.markdown("---")
 st.sidebar.markdown("### 📂 Carga de Rutas Diarias")
 
-# Botón para subir el archivo CSV del día
 uploaded_file = st.sidebar.file_uploader(
     "Sube el archivo CSV del día:", type=["csv"]
 )
@@ -38,7 +37,6 @@ if uploaded_file is not None:
     st.error(f"Error al leer el archivo CSV: {e}")
     st.stop()
 else:
-  # Datos de prueba por defecto con horarios
   data = {
       "Cerrador": [
           "Carlos Vivas (Demo)",
@@ -64,19 +62,16 @@ else:
       "💡 Usando datos de prueba con horario. Sube tu CSV para actualizar."
   )
 
-# Selector de cerrador en la barra lateral
 lista_cerradores = ["Seleccione..."] + sorted(df["Cerrador"].unique().tolist())
 cerrador_activo = st.sidebar.selectbox(
     "Seleccione su Usuario (Cerrador):", lista_cerradores
 )
 
-# Encabezado principal
 st.markdown("## 📍 Planificador de Rutas - Operaciones Diarias")
 
 if cerrador_activo != "Seleccione...":
   df_filtrado = df[df["Cerrador"] == cerrador_activo]
 
-  # Ordenar automáticamente de forma cronológica por la hora de la cita
   if "Hora" in df_filtrado.columns:
     df_filtrado = df_filtrado.sort_values(by="Hora")
 
@@ -88,13 +83,11 @@ if cerrador_activo != "Seleccione...":
   )
   st.info(f"Total de clientes en ruta: {len(df_filtrado)}")
 
-  # Mostrar la tabla incluyendo la columna Hora
   st.dataframe(
       df_filtrado[["Hora", "Cliente", "Direccion", "Telefono", "Estatus"]],
       use_container_width=True,
   )
 
-  # Detalle interactivo y enlaces de navegación GPS
   st.markdown("---")
   st.markdown("### 🔍 Detalle de Visita y Navegación")
   cliente_seleccionado = st.selectbox(
@@ -111,29 +104,18 @@ if cerrador_activo != "Seleccione...":
     st.write(f"**Teléfono:** {datos_cliente['Telefono']}")
     st.write(f"**Estatus actual:** {datos_cliente['Estatus']}")
 
-    # Preparar la dirección para los enlaces de mapas
     direccion_encoded = urllib.parse.quote(str(datos_cliente["Direccion"]))
-    url_gmaps = f"https://www.google.com/maps/search/?api=1&query={direccion_encoded}"
+    url_gmaps = (
+        f"https://www.google.com/maps/search/?api=1&query={direccion_encoded}"
+    )
     url_waze = f"https://waze.com/ul?q={direccion_encoded}&navigate=yes"
 
     st.markdown("##### Abrir aplicación de ruta:")
     col1, col2 = st.columns(2)
     with col1:
-      st.markdown(
-          f'<a href="{url_gmaps}" target="_blank"'
-          ' style="display:inline-block;padding:10px'
-          " 15px;background-color:#4285F4;color:white;text-align:center;text-decoration:none;border-radius:5px;font-weight:bold;width:100%;">🗺️"
-          f' Google Maps</a>',
-          unsafe_allow_html=True,
-      )
+      st.link_button("🗺️ Google Maps", url_gmaps, use_container_width=True)
     with col2:
-      st.markdown(
-          f'<a href="{url_waze}" target="_blank"'
-          ' style="display:inline-block;padding:10px'
-          " 15px;background-color:#0099ff;color:white;text-align:center;text-decoration:none;border-radius:5px;font-weight:bold;width:100%;">🚗"
-          f" Waze</a>",
-          unsafe_allow_html=True,
-      )
+      st.link_button("🚗 Waze", url_waze, use_container_width=True)
 
     st.markdown("<br>", unsafe_allow_html=True)
     if st.button("Marcar visita como Completada"):
