@@ -2,107 +2,73 @@ import pandas as pd
 import streamlit as st
 
 st.set_page_config(
-    page_title="Optimum Home - Rutas de Campo", page_icon="🚗", layout="centered"
+    page_title="Optimum Home - Rutas del Día",
+    page_icon="🚗",
+    layout="centered",
 )
 
-with st.sidebar:
-  # Carga segura del logo (si no lo encuentra, muestra texto elegante en vez de dar error)
-  try:
-    st.image("logo_optimum.png", use_container_width=True)
-  except:
-    st.markdown("## 🏢 Optimum Home")
+st.sidebar.markdown("### 🚗 Panel de Control de Campo")
 
-  st.markdown("### Panel de Control de Campo")
+# Cargar el archivo CSV del día correspondiente
+try:
+  df = pd.read_csv("rutas_del_dia_2026-08-25.csv")
+except FileNotFoundError:
+  st.error(
+      "No se encontró el archivo de rutas del día"
+      " ('rutas_del_dia_2026-08-25.csv'). Por favor, verifique que esté subido"
+      " al repositorio."
+  )
+  st.stop()
 
-  cerrador_activo = st.selectbox(
-      "Seleccione su Usuario (Cerrador):",
-      [
-          "Seleccione...",
-          "Carlos Vivas (Demo)",
-          "Cerrador 1 - Houston North",
-          "Cerrador 2 - Houston South",
-      ],
+# Selector de cerrador en la barra lateral
+lista_cerradores = ["Seleccione..."] + sorted(df["Cerrador"].unique().tolist())
+cerrador_activo = st.sidebar.selectbox(
+    "Seleccione su Usuario (Cerrador):", lista_cerradores
+)
+
+# Encabezado principal de la aplicación
+st.markdown("## 📍 Planificador de Rutas - Operaciones Diarias")
+
+if cerrador_activo != "Seleccione...":
+  # Filtro estricto: el operador solo ve sus propias asignaciones
+  df_filtrado = df[df["Cerrador"] == cerrador_activo]
+
+  st.sidebar.success(f"Usuario activo: {cerrador_activo}")
+  st.markdown(
+      f"### 📋 Visitas asignadas para: **{cerrador_activo}**"
+  )
+  st.info(f"Total de clientes en ruta: {len(df_filtrado)}")
+
+  # Mostrar la tabla limpia con los datos de las visitas
+  st.dataframe(
+      df_filtrado[["Cliente", "Direccion", "Telefono", "Estatus"]],
+      use_container_width=True,
   )
 
+  # Opcional: Detalle interactivo por cliente
   st.markdown("---")
-  st.info("Use los botones de navegación para trazar la ruta automática.")
-
-st.title("📍 Planificador de Rutas - Houston")
-
-if cerrador_activo == "Seleccione...":
-  st.warning(
-      "Por favor, seleccione su nombre en la barra lateral para ver su ruta"
-      " asignada del día."
+  st.markdown("### 🔍 Detalle de Visita")
+  cliente_seleccionado = st.selectbox(
+      "Seleccione un cliente para gestionar:",
+      df_filtrado["Cliente"].tolist(),
   )
+
+  if cliente_seleccionado:
+    datos_cliente = df_filtrado[
+        df_filtrado["Cliente"] == cliente_seleccionado
+    ].iloc[0]
+    st.write(f"**Dirección:** {datos_cliente['Direccion']}")
+    st.write(f"**Teléfono:** {datos_cliente['Telefono']}")
+    st.write(f"**Estatus actual:** {datos_cliente['Estatus']}")
+
+    if st.button("Marcar visita como Completada"):
+      st.success(
+          f"La visita al cliente {cliente_seleccionado} ha sido registrada con"
+          " éxito."
+      )
+
 else:
-  st.success(f"¡Bienvenido, **{cerrador_activo}**! Tienes 5 citas asignadas hoy.")
-
-  data_prueba = [
-      {
-          "nombre": "Renee C Butler & Stephen M Butler",
-          "direccion": "611 Mosman Ct, Houston, TX",
-          "telefono": "+17135550142",
-      },
-      {
-          "nombre": "Oanh Pham & Ker Teh",
-          "direccion": "11511 Sugarbush Ridge Ln, Houston, TX",
-          "telefono": "+17135550189",
-      },
-      {
-          "nombre": "Dora E Hogan & Louis Hogan",
-          "direccion": "11518 Chesswood Dr, Houston, TX",
-          "telefono": "+17135550234",
-      },
-      {
-          "nombre": "Ramona H Brady & Dennis Brady",
-          "direccion": "506 Bridge Crest Blvd, Houston, TX",
-          "telefono": "+17135550378",
-      },
-      {
-          "nombre": "Aurelio G Galvan",
-          "direccion": "5503 Fair Forest Dr, Houston, TX",
-          "telefono": "+17135550491",
-      },
-  ]
-
-  df_rutas = pd.DataFrame(data_prueba)
-
-  for index, row in df_rutas.iterrows():
-    with st.container():
-      st.markdown(f"### 🏠 Parada #{index + 1}: {row['nombre']}")
-      st.markdown(f"**Dirección:** {row['direccion']}")
-      st.markdown(f"**Teléfono:** {row['telefono']}")
-
-      dir_url = row["direccion"].replace(" ", "+")
-      link_gmaps = f"https://www.google.com/maps/dir/?api=1&destination={dir_url}"
-      link_waze = f"https://waze.com/ul?q={dir_url}&navigate=yes"
-
-      col_call, col_map, col_waze = st.columns(3)
-
-      with col_call:
-        st.markdown(
-            f'<a href="tel:{row["telefono"]}" target="_self"><button'
-            ' style="width:100%; background-color:#2e7d32; color:white;'
-            ' border:none; padding:10px; border-radius:5px;'
-            ' font-weight:bold;">📞 Llamar</button></a>',
-            unsafe_allow_html=True,
-        )
-
-      with col_map:
-        st.markdown(
-            f'<a href="{link_gmaps}" target="_blank"><button style="width:100%;'
-            " background-color:#1976d2; color:white; border:none; padding:10px;"
-            ' border-radius:5px; font-weight:bold;">🗺️ Google'
-            " Maps</button></a>",
-            unsafe_allow_html=True,
-        )
-
-      with col_waze:
-        st.markdown(
-            f'<a href="{link_waze}" target="_blank"><button style="width:100%;'
-            " background-color:#00acc1; color:white; border:none; padding:10px;"
-            ' border-radius:5px; font-weight:bold;">🚗 Waze</button></a>',
-            unsafe_allow_html=True,
-        )
-
-      st.markdown("---")
+  st.warning(
+      "Por favor, seleccione su nombre o rol de cerrador en la barra lateral"
+      " izquierda para acceder a su ruta asignada."
+  )
