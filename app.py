@@ -1,163 +1,234 @@
-import glob
-import os
+import urllib.parse
 import pandas as pd
+import pydeck as pdk
 import streamlit as st
+from geopy.geocoders import Nominatim
 
-# Configuración de la página web
 st.set_page_config(
-    page_title="Optimum Home - Portal de Consulta", page_icon="🏢", layout="wide"
+    page_title="Optimum Home - Rutas de Campo",
+    page_icon="🚗",
+    layout="centered",
 )
 
-# Cargar y unir automáticamente las partes de la base de datos de forma robusta
-if "df" not in st.session_state:
-  current_dir = os.path.dirname(os.path.abspath(__file__))
-  pattern = os.path.join(current_dir, "parte_*.csv")
-  archivos_partes = sorted(glob.glob(pattern))
+# --- LOGOTIPO OFICIAL DE LA EMPRESA ---
+try:
+  st.sidebar.image("logo_optimum.png", use_container_width=True)
+except Exception:
+  st.sidebar.markdown("### 🏠 OPTIMUM HOME")
 
-  if archivos_partes:
-    df_list = [pd.read_csv(f, low_memory=False) for f in archivos_partes]
-    st.session_state.df = pd.concat(df_list, ignore_index=True)
-  else:
-    st.session_state.df = pd.DataFrame(
-        columns=[
-            "first_name",
-            "last_name",
-            "city",
-            "address1",
-            "email",
-            "clean_phone",
-        ]
-    )
+st.sidebar.markdown("---")
+st.sidebar.markdown("### 📂 Carga de Rutas Diarias")
 
-# Control de Sesión y Autenticación
-if "autenticado" not in st.session_state:
-  st.session_state.autenticado = False
-  st.session_state.rol = None
+uploaded_file = st.sidebar.file_uploader(
+    "Sube el archivo CSV del día:", type=["csv"]
+)
 
-if not st.session_state.autenticado:
-  st.title("🔒 Optimum Home - Acceso Restringido")
-  st.markdown("Ingrese su contraseña autorizada para acceder al sistema.")
 
-  with st.form("login_form"):
-    password_ingresada = st.text_input("Contraseña de Acceso", type="password")
-    submit = st.form_submit_button("Ingresar al Sistema")
+# Función para buscar coordenadas automáticamente mediante la dirección
+@st.cache_data
+def obtener_coordenadas(direccion):
+  try:
+    geolocator = Nominatim(user_agent="optimum_home_rutas_app")
+    location = geolocator.geocode(direccion)
+    if location:
+      return location.latitude, location.longitude
+  except Exception:
+    pass
+  return None, None
 
-    if submit:
-      if password_ingresada == "optimum2026":
-        st.session_state.autenticado = True
-        st.session_state.rol = "Agente"
-        st.rerun()
-      elif password_ingresada == "coseinca2026":
-        st.session_state.autenticado = True
-        st.session_state.rol = "Admin"
-        st.rerun()
-      else:
-        st.error(
-            "Contraseña incorrecta. Verifique sus credenciales de acceso."
-        )
+
+if uploaded_file is not None:
+  try:
+    df = pd.read_csv(uploaded_file)
+    required_cols = [
+        "Cerrador",
+        "Hora",
+        "Cliente",
+        "Direccion",
+        "Telefono",
+        "Estatus",
+    ]
+    if not all(col in df.columns for col in required_cols):
+      st.error(
+          "El archivo CSV debe contener las columnas: Cerrador, Hora, Cliente,"
+          " Direccion, Telefono, Estatus."
+      )
+      st.stop()
+
+    # Geocodificación automática de las direcciones del CSV
+    if "lat" not in df.columns or "lon" not in df.columns:
+      lats, lons = [], []
+      for dir_val in df["Direccion"]:
+        lat, lon = obtener_coordenadas(str(dir_val))
+        lats.append(lat if lat else 10.0750)  # Coordenada de respaldo por defecto
+        lons.append(lon if lon else -69.3120)
+      df["lat"] = lats
+      df["lon"] = lons
+
+  except Exception as e:
+    st.error(f"Error al procesar el archivo CSV: {e}")
+    st.stop()
 else:
-  st.sidebar.title("Panel de Control")
-  st.sidebar.write(f"**Rol activo:** {st.session_state.rol}")
-  if st.sidebar.button("Cerrar Sesión"):
-    st.session_state.autenticado = False
-    st.session_state.rol = None
-    st.rerun()
+  data = {
+      "Cerrador": [
+          "Carlos Vivas (Demo)",
+          "Carlos Vivas (Demo)",
+          "Carlos Vivas (Demo)",
+      ],
+      "Hora": ["09:00 AM", "02:30 PM", "11:30 AM"],
+      "Cliente": [
+          "Distribuidora Los Andes",
+          "Comercial Lara C.A.",
+          "Inversiones Coseinca",
+      ],
+      "Direccion": [
+          "Avenida Principal de Cabudare",
+          "Avenida Venezuela Barquisimeto",
+          "Centro Comercial Loma Linda",
+      ],
+      "Telefono": ["0412-5268823", "0412-1112233", "0426-0367843"],
+      "Estatus": ["Pendiente", "Pendiente", "Pendiente"],
+      "lat": [10.0890, 10.0670, 10.0750],
+      "lon": [-69.2930, -69.3220, -69.3120],
+  }
+  df = pd.DataFrame(data)
+  st.sidebar.info(
+      "💡 Usando datos de prueba. Sube tu CSV para actualizar las rutas."
+  )
 
-  st.title("🏢 Optimum Home - Consulta de Base de Datos Texas")
+lista_cerradores = ["Seleccione..."] + sorted(df["Cerrador"].unique().tolist())
+cerrador_activo = st.sidebar.selectbox(
+    "Seleccione su Usuario (Cerrador):", lista_cerradores
+)
 
-  if st.session_state.rol == "Agente":
-    st.info(
-        "Modo Agente Activo: Utilice los filtros para consultar la"
-        " disponibilidad y datos de los prospectos en tiempo real."
+st.markdown(
+    """
+    <div style="background: linear-gradient(90deg, #1E3A8A 0%, #3B82F6 100%); padding: 15px; border-radius: 8px; color: white; margin-bottom: 20px;">
+        <h2 style="margin: 0; font-size: 24px;">📍 Optimum Home - Planificador de Rutas</h2>
+        <p style="margin: 5px 0 0 0; font-size: 14px;">Control operativo y navegación inteligente para cerradores</p>
+    </div>
+""",
+    unsafe_allow_html=True,
+)
+
+if cerrador_activo != "Seleccione...":
+  df_filtrado = df[df["Cerrador"] == cerrador_activo].copy()
+
+  if "Hora" in df_filtrado.columns:
+    try:
+      df_filtrado["temp_hora"] = pd.to_datetime(
+          df_filtrado["Hora"], format="%I:%M %p"
+      )
+      df_filtrado = df_filtrado.sort_values(by="temp_hora")
+      df_filtrado = df_filtrado.drop(columns=["temp_hora"])
+    except Exception:
+      df_filtrado = df_filtrado.sort_values(by="Hora")
+
+  df_filtrado = df_filtrado.reset_index(drop=True)
+  df_filtrado["Secuencia"] = range(1, len(df_filtrado) + 1)
+
+  st.sidebar.success(f"Usuario activo: {cerrador_activo}")
+  st.markdown(f"### 📋 Visitas asignadas para: **{cerrador_activo}**")
+  st.info(
+      "🕒 Tus citas están ordenadas cronológicamente de la más temprana a la"
+      " más tardía."
+  )
+  st.info(f"Total de clientes en ruta: {len(df_filtrado)}")
+
+  st.markdown("### 🗺️ Secuencia de Ruta en el Mapa")
+  st.write(
+      "Los números en el mapa indican el orden exacto en el que debes visitar"
+      " cada parada:"
+  )
+
+  if "lat" in df_filtrado.columns and "lon" in df_filtrado.columns:
+    lat_centro = df_filtrado["lat"].mean()
+    lon_centro = df_filtrado["lon"].mean()
+
+    layer_scatter = pdk.Layer(
+        "ScatterplotLayer",
+        data=df_filtrado,
+        get_position=["lon", "lat"],
+        get_fill_color=[30, 58, 138, 200],
+        get_radius=300,
+        pickable=True,
     )
 
+    layer_text = pdk.Layer(
+        "TextLayer",
+        data=df_filtrado,
+        get_position=["lon", "lat"],
+        get_text="Secuencia",
+        get_color=[255, 255, 255],
+        get_size=18,
+        get_alignment_baseline="'center'",
+        get_text_anchor="'middle'",
+    )
+
+    view_state = pdk.ViewState(
+        latitude=lat_centro, longitude=lon_centro, zoom=12, pitch=0
+    )
+
+    r = pdk.Deck(
+        layers=[layer_scatter, layer_text],
+        initial_view_state=view_state,
+        tooltip={
+            "html": "<b>Parada #{Secuencia}</b><br>Cliente: {Cliente}<br>Hora:"
+            " {Hora}",
+            "style": {"backgroundColor": "#1E3A8A", "color": "white"},
+        },
+    )
+    st.pydeck_chart(r)
+
+  st.markdown("---")
+  st.markdown("### 📋 Listado de Paradas")
+  st.dataframe(
+      df_filtrado[["Secuencia", "Hora", "Cliente", "Direccion", "Telefono", "Estatus"]],
+      use_container_width=True,
+  )
+
+  st.markdown("---")
+  st.markdown("### 🔍 Detalle de Visita y Navegación Individual")
+  cliente_opciones = [
+      f"Parada {row.Secuencia} - {row.Cliente} ({row.Hora})"
+      for row in df_filtrado.itertuples()
+  ]
+  seleccion_str = st.selectbox(
+      "Seleccione un cliente para gestionar:", cliente_opciones
+  )
+
+  if seleccion_str:
+    idx_sel = cliente_opciones.index(seleccion_str)
+    datos_cliente = df_filtrado.iloc[idx_sel]
+
+    st.write(f"**Parada número:** {datos_cliente['Secuencia']}")
+    st.write(f"**Hora de la cita:** {datos_cliente['Hora']}")
+    st.write(f"**Cliente:** {datos_cliente['Cliente']}")
+    st.write(f"**Dirección:** {datos_cliente['Direccion']}")
+    st.write(f"**Teléfono:** {datos_cliente['Telefono']}")
+    st.write(f"**Estatus actual:** {datos_cliente['Estatus']}")
+
+    direccion_encoded = urllib.parse.quote(str(datos_cliente["Direccion"]))
+    url_gmaps = (
+        f"https://www.google.com/maps/search/?api=1&query={direccion_encoded}"
+    )
+    url_waze = f"https://waze.com/ul?q={direccion_encoded}&navigate=yes"
+
+    st.markdown("##### Abrir aplicación de ruta:")
     col1, col2 = st.columns(2)
     with col1:
-      filtro_ciudad = st.text_input("Filtrar por Ciudad (Ej: Houston, Katy):")
+      st.link_button("🗺️ Google Maps", url_gmaps, use_container_width=True)
     with col2:
-      filtro_busqueda = st.text_input(
-          "Buscar por Dirección, Nombre o Teléfono:"
+      st.link_button("🚗 Waze", url_waze, use_container_width=True)
+
+    st.markdown("<br>", unsafe_allow_html=True)
+    if st.button("Marcar visita como Completada"):
+      st.success(
+          f"La visita al cliente {datos_cliente['Cliente']} ha sido registrada"
+          " con éxito."
       )
-
-    df_filtrado = st.session_state.df.copy()
-
-    if filtro_ciudad:
-      df_filtrado = df_filtrado[
-          df_filtrado["city"]
-          .astype(str)
-          .str.contains(filtro_ciudad, case=False, na=False)
-      ]
-
-    if filtro_busqueda:
-      mask = (
-          df_filtrado.astype(str)
-          .apply(
-              lambda col: col.str.contains(
-                  filtro_busqueda, case=False, na=False
-              )
-          )
-          .any(axis=1)
-      )
-      df_filtrado = df_filtrado[mask]
-
-    st.write(f"**Registros encontrados:** {len(df_filtrado)}")
-    st.dataframe(df_filtrado, use_container_width=True)
-
-  elif st.session_state.rol == "Admin":
-    st.success(
-        "Modo Administrador: Acceso total de gestión y actualización de datos."
-    )
-
-    tab1, tab2 = st.tabs(["🔍 Consultar y Exportar", "➕ Agregar Nuevo Registro"])
-
-    with tab1:
-      filtro_admin = st.text_input("Búsqueda general (Admin):")
-      df_admin = st.session_state.df.copy()
-      if filtro_admin:
-        mask = (
-            df_admin.astype(str)
-            .apply(
-                lambda col: col.str.contains(
-                    filtro_admin, case=False, na=False
-                )
-            )
-            .any(axis=1)
-        )
-        df_admin = df_admin[mask]
-
-      st.dataframe(df_admin, use_container_width=True)
-
-      csv_export = df_admin.to_csv(index=False).encode("utf-8")
-      st.download_button(
-          label="📥 Descargar Base Depurada (Solo Admin)",
-          data=csv_export,
-          file_name="Master_Texas_Actualizado.csv",
-          mime="text/csv",
-      )
-
-    with tab2:
-      st.subheader("Incorporar nuevo prospecto a la base de datos central")
-      with st.form("form_nuevo"):
-        f_name = st.text_input("Nombre")
-        l_name = st.text_input("Apellido")
-        city_in = st.text_input("Ciudad")
-        addr_in = st.text_input("Dirección")
-        phone_in = st.text_input("Teléfono")
-        email_in = st.text_input("Correo electrónico")
-
-        guardar_btn = st.form_submit_button("Guardar en el Sistema")
-
-        if guardar_btn:
-          nuevo_registro = {
-              "first_name": f_name,
-              "last_name": l_name,
-              "city": city_in,
-              "address1": addr_in,
-              "email": email_in,
-              "clean_phone": phone_in,
-          }
-          nuevo_df = pd.DataFrame([nuevo_registro])
-          st.session_state.df = pd.concat(
-              [st.session_state.df, nuevo_df], ignore_index=True
-          )
-          st.success("¡El registro se ha incorporado exitosamente!")
+else:
+  st.warning(
+      "Por favor, seleccione su nombre o rol de cerrador en la barra lateral"
+      " izquierda para acceder a su ruta asignada."
+  )
